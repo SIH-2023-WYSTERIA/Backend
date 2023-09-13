@@ -24,6 +24,7 @@ def token_required(role):
                 request.environ['decoded_jwt'] = data.get('sub')
                 if user_role != role:
                     return jsonify({'message': 'Unauthorized'}), 403
+
             except jwt.ExpiredSignatureError:
                 return jsonify({'message': 'Token has expired'}), 401
             except jwt.InvalidTokenError:

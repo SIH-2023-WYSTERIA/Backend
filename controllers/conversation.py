@@ -10,7 +10,6 @@ from services import Model_Inference
 
 ALLOWED_EXTENSIONS = ["mp3", "wav"]
 
-from time import perf_counter
 
 
 class SendConversation(EmployeeAPI, S3, MongoDB):
@@ -24,7 +23,6 @@ class SendConversation(EmployeeAPI, S3, MongoDB):
         )
 
     def post(self):
-        start_time = perf_counter()
         # Check if a file was uploaded in the request
         if "file" not in request.files:
             return jsonify({"message": "No file part"}), 400
@@ -58,31 +56,33 @@ class SendConversation(EmployeeAPI, S3, MongoDB):
             # Save the uploaded file to the temporary location
             file.save(file_path)
 
-            # Get model inference using the file path
-            inference = Model_Inference(file_path)  # Ensure Model_Inference accepts a file path
-
             # Upload the file using the inherited S3Manager
             success, error = self.upload_file(file, filename)
 
             if not success:
                 return jsonify({'message': 'Failed to upload file to S3', 'error': error}), 500
 
+            # Generate the S3 URL for the uploaded file
+            s3_url = self.generate_presigned_url(filename)
+
             # Optionally, you can perform further processing on the uploaded file here
-            user = self.get_employee()
-            username = user['username']
-            stream_url = self.generate_presigned_url(filename)
+            employee = self.get_employee()
+            employee_id = employee['employee_id']
+            company_id = employee['company_id']
+            inference = Model_Inference(file_path)  # Ensure Model_Inference accepts a file path
 
-            _ = self.db.conversations.insert_one({'username': username, 'stream_url': stream_url, 'inference': inference}).inserted_id
+            _ = self.db.conversations.insert_one({'employee_id': employee_id, 
+                                                  'company_id' : company_id,
+                                                  'stream_url': s3_url, 
+                                                  'inference': inference}).inserted_id
 
-            # Return the result of inference along with a success message
-            return jsonify({'message': 'File uploaded and processed successfully', 'inference': inference}), 200
+            # Return the S3 URL after successfully uploading
+            return jsonify({'message': 'File uploaded and processed successfully'}), 200
 
         finally:
             # Delete the temporary file and directory after processing
             os.remove(file_path)
             os.rmdir(temp_dir)
-            latency = perf_counter() - start_time
-            print(latency)
 
 
 class GetAllConversations(AdminAPI, MongoDB):
@@ -94,7 +94,10 @@ class GetAllConversations(AdminAPI, MongoDB):
         conversations = list(self.db.conversations.find({}))
         # Transform MongoDB documents to a list of dictionaries (JSON serializable)
         conversations_json = [
-            {"username": conv["username"], "stream_url": conv["stream_url"],"inference":conv.get("inference", {})}
+            {"employee_id": conv["employee_id"], 
+             "company_id": conv["company_id"], 
+             "stream_url": conv["stream_url"],
+             "inference":conv.get("inference", {})}
             for conv in conversations
         ]
 

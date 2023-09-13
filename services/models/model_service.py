@@ -1,6 +1,5 @@
-import shutil
 from typing import List, Optional, Union
-import os
+
 import numpy as np
 import requests
 import torch
@@ -10,7 +9,6 @@ from transformers import pipeline
 from transformers.pipelines.audio_utils import ffmpeg_read
 import torchaudio
 import io
-from pydub import AudioSegment
 
 import torch
 
@@ -102,6 +100,7 @@ def preprocess(inputs):
 
     return inputs, diarizer_inputs
 
+
 def speech2text_pipeline(input, diarization_pipeline, asr_pipeline):
     inputs, diarizer_inputs = preprocess(input)
     diarization_pipeline.to(torch.device(device))
@@ -135,40 +134,57 @@ def speech2text_pipeline(input, diarization_pipeline, asr_pipeline):
             )
             prev_segment = segments[i]
 
-    chunks = []
+    new_segments.append(
+        {
+            "segment": {
+                "start": prev_segment["segment"]["start"],
+                "end": cur_segment["segment"]["end"],
+            },
+            "speaker": prev_segment["label"],
+        }
+    )
+
+    asr_out = asr_pipeline(
+        {"array": inputs, "sampling_rate": sampling_rate},
+        chunk_length_s=30,
+        return_timestamps=True,
+    )
+
+    transcript = asr_out["chunks"]
+    end_timestamps = np.array([chunk["timestamp"][-1] for chunk in transcript])
+    if end_timestamps[-1] == None:
+        end_timestamps[-1] = new_segments[-1]["segment"]["end"]
+
+    group_by_speaker = True
+
+    segmented_preds = []
     for segment in new_segments:
-        chunks.append(segment["segment"])
-
-    def chunk_audio(input_file, output_folder, chunks):
-        audio = AudioSegment.from_file(input_file)
-        os.makedirs(output_folder, exist_ok=True)
-
-        for i, chunk in enumerate(chunks):
-            start_time = chunk["start"] * 1000
-            end_time = chunk["end"] * 1000
-            chunk_audio = audio[start_time:end_time]
-            output_file = os.path.join(output_folder, f"chunk_{i}.mp3")
-            chunk_audio.export(output_file, format="wav")
-
-        print(f"Audio file '{input_file}' has been chunked into {len(chunks)} chunks.")
-
-    input_file = input
-    output_folder = "folder"
-
-    chunk_audio(input_file, output_folder, chunks)
-
-    res = []
-    for i in range(len(new_segments)):
-        inputs, diarizer_inputs = preprocess(os.path.join("folder", f"chunk_{i}.mp3"))
-        asr = asr_pipeline(
-            {"array": inputs, "sampling_rate": sampling_rate}, chunk_length_s=30
-        )
-        res.append(asr)
-
-    shutil.rmtree("folder")
+        end_time = segment["segment"]["end"]
+        try:
+            upto_idx = np.argmin(np.abs(end_timestamps - end_time))
+        except ValueError:
+            continue
+        if group_by_speaker:
+            segmented_preds.append(
+                {
+                    "speaker": segment["speaker"],
+                    "text": "".join(
+                        [chunk["text"] for chunk in transcript[: upto_idx + 1]]
+                    ),
+                    "timestamp": (
+                        transcript[0]["timestamp"][0],
+                        transcript[upto_idx]["timestamp"][1],
+                    ),
+                }
+            )
+        else:
+            for i in range(upto_idx + 1):
+                segmented_preds.append({"speaker": segment["speaker"], **transcript[i]})
+        transcript = transcript[upto_idx + 1 :]
+        end_timestamps = end_timestamps[upto_idx + 1 :]
 
     conv = []
-    for i, sub in enumerate(res):
+    for i, sub in enumerate(segmented_preds):
         if i % 2 == 0:
             conv.append(f"helpdesk:{sub['text']}")
         else:
@@ -180,10 +196,8 @@ def speech2text_pipeline(input, diarization_pipeline, asr_pipeline):
 model_name = "Venkatesh4342/bart-samsum"
 
 
-pipe = pipeline("summarization", model=model_name, device=device)
-
-
 def summerization_pipeline(s2t_output, model_name):
+    pipe = pipeline("summarization", model=model_name, device=device)
     pipe_out = pipe("\n".join(s2t_output))
     return pipe_out[0]["summary_text"]
 

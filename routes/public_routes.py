@@ -1,9 +1,16 @@
 from flask import Blueprint
-from controllers.auth import Login, Register
+from controllers.auth import (
+    CompanyLogin,
+    EmployeeLogin,
+    RegisterCompany,
+    RegisterEmployee,
+)
 from controllers.conversation import SendConversation
 
-public_bp = Blueprint('public', __name__,url_prefix='/public')
+public_bp = Blueprint("public", __name__, url_prefix="/public")
 
 # Register the Login and Register classes for public routes
-public_bp.add_url_rule('/login', view_func=Login.as_view('login'))
-public_bp.add_url_rule('/register', view_func=Register.as_view('register'))
+public_bp.add_url_rule("/company/login", view_func=CompanyLogin.as_view("company_login"))
+public_bp.add_url_rule("/employee/login", view_func=EmployeeLogin.as_view("employee_login"))
+public_bp.add_url_rule("/company/register", view_func=RegisterCompany.as_view("register_company"))
+public_bp.add_url_rule("/employee/register", view_func=RegisterEmployee.as_view("register_employee"))
