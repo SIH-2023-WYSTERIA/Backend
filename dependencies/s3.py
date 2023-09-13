@@ -21,6 +21,15 @@ class S3:
             return False, str(e)
         return True, None
     
+    def generate_presigned_url(self, file_key):
+        # Generate a pre-signed URL for the audio file
+        presigned_url = self.s3.generate_presigned_url(
+            'get_object',
+            Params={'Bucket': os.getenv('S3_BUCKET_NAME'), 'Key': file_key},
+            ExpiresIn=31536000  # Set an expiration time for the URL (e.g., 1 hour)
+        )
+        return presigned_url
+    
 
 if __name__ == "__main__":
     s3 = S3()
