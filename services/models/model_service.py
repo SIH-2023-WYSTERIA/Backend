@@ -1,6 +1,6 @@
 import shutil
 from typing import List, Optional, Union
-
+import os
 import numpy as np
 import requests
 import torch
@@ -101,7 +101,6 @@ def preprocess(inputs):
     diarizer_inputs = diarizer_inputs.unsqueeze(0)
 
     return inputs, diarizer_inputs
-
 
 def speech2text_pipeline(input, diarization_pipeline, asr_pipeline):
     inputs, diarizer_inputs = preprocess(input)
