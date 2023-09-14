@@ -132,6 +132,7 @@ pyarrow==13.0.0
 pycparser==2.21
 pydantic==2.1.1
 pydantic_core==2.4.0
+pydub==0.25.1
 Pygments==2.16.1
 PyJWT==2.8.0
 pymongo==4.5.0
