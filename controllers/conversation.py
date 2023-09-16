@@ -21,6 +21,13 @@ class SendConversation(EmployeeAPI, S3, MongoDB):
         return (
             "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
         )
+    
+    # Function to get the next available index
+    def get_next_index(self):
+        last_document = self.db.conversations.find_one(sort=[("index", -1)])
+        if last_document:
+            return last_document['index'] + 1
+        return 1  # If no documents exist, start from 1
 
     def post(self):
         # Check if a file was uploaded in the request
@@ -57,7 +64,7 @@ class SendConversation(EmployeeAPI, S3, MongoDB):
             file.save(file_path)
 
             # Upload the file using the inherited S3Manager
-            success, error = self.upload_file(file, filename)
+            success, error = self.upload_file(file_path, filename)
 
             if not success:
                 return jsonify({'message': 'Failed to upload file to S3', 'error': error}), 500
@@ -65,18 +72,19 @@ class SendConversation(EmployeeAPI, S3, MongoDB):
             # Generate the S3 URL for the uploaded file
             s3_url = self.generate_presigned_url(filename)
 
-            # Optionally, you can perform further processing on the uploaded file here
             employee = self.get_employee()
             employee_id = employee['employee_id']
             company_id = employee['company_id']
+            index = self.get_next_index()
             inference = Model_Inference(file_path)  # Ensure Model_Inference accepts a file path
 
             _ = self.db.conversations.insert_one({'employee_id': employee_id, 
                                                   'company_id' : company_id,
                                                   'stream_url': s3_url, 
+                                                  'index':index,
                                                   'inference': inference}).inserted_id
 
-            # Return the S3 URL after successfully uploading
+
             return jsonify({'message': 'File uploaded and processed successfully'}), 200
 
         finally:

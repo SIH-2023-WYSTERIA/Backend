@@ -1,16 +1,22 @@
-from typing import List, Optional, Union
+import os
+import shutil
 
 import numpy as np
+import pandas as pd
 import requests
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import f1_score
+from sklearn.model_selection import train_test_split
 import torch
 from pyannote.audio import Pipeline
 from torchaudio import functional as F
 from transformers import pipeline
 from transformers.pipelines.audio_utils import ffmpeg_read
-import torchaudio
-import io
+import gc
 
 import torch
+import time
+
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -21,14 +27,23 @@ diarization_pipeline = Pipeline.from_pretrained(
     use_auth_token="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",
 )
 
+from optimum.onnxruntime import ORTModelForSequenceClassification
+from optimum.onnxruntime import ORTQuantizer, ORTModelForSequenceClassification
+from optimum.onnxruntime.configuration import AutoQuantizationConfig
+
 from transformers import (
+    Trainer,
+    TrainingArguments,
+    AutoModelForSequenceClassification,
+    AutoConfig,
+    AutoTokenizer,
     WhisperProcessor,
     WhisperForConditionalGeneration,
     WhisperFeatureExtractor,
     WhisperTokenizer,
     WhisperProcessor,
 )
-from datasets import Audio, load_dataset
+from datasets import Audio, load_dataset, Features, Value, ClassLabel
 
 processor = WhisperProcessor.from_pretrained("Venkatesh4342/whisper-small-en-hi")
 forced_decoder_ids = processor.get_decoder_prompt_ids(
@@ -202,9 +217,6 @@ def summerization_pipeline(s2t_output, model_name):
     return pipe_out[0]["summary_text"]
 
 
-from optimum.onnxruntime import ORTModelForSequenceClassification
-from transformers import AutoTokenizer
-
 quant_model = ORTModelForSequenceClassification.from_pretrained("services/models/model")
 quant_tokenizer = AutoTokenizer.from_pretrained(
     "Venkatesh4342/distilbert-helpdesk-sentiment"
@@ -213,13 +225,17 @@ quant_tokenizer = AutoTokenizer.from_pretrained(
 
 def classification(summerized_op, quant_model, quant_tokenizer):
     pipe = pipeline(
-        "text-classification", model=quant_model, tokenizer=quant_tokenizer, device=0
+        "text-classification",
+        model=quant_model,
+        tokenizer=quant_tokenizer,
+        device=device,
     )
     res = pipe(summerized_op)
     return res
 
 
 def Model_Inference(file):
+    start = time.time()
     data = {}
     speech2text_output = speech2text_pipeline(file, diarization_pipeline, asr_pipeline)
     summerized_output = summerization_pipeline(speech2text_output, model_name)
@@ -227,9 +243,115 @@ def Model_Inference(file):
 
     data.update(
         {
+            "conversation_transcript":speech2text_output,
             "summary": summerized_output,
             "sentiment": sentiment[0]["label"],
             "score": sentiment[0]["score"],
         }
     )
+    end = time.time()
+    print(end - start)
+    torch.cuda.empty_cache()
+    gc.collect()
     return data
+
+
+def finetune(filepath):
+    df = pd.read_csv(filepath, encoding="utf-8")
+    train, validation = train_test_split(
+        df, test_size=0.09, random_state=42, stratify=df["label"]
+    )
+    train.to_csv("train_help.csv", index=False)
+    validation.to_csv("val_help.csv", index=False)
+
+    class_names = ["Negative", "Neutral", "Positive"]
+    ft = Features(
+        {
+            "text": Value(dtype="string", id=None),
+            "label": ClassLabel(num_classes=3, names=class_names),
+        }
+    )
+    dataset = load_dataset(
+        "csv",
+        data_files={"train": "train_help.csv", "validation": "val_help.csv"},
+        features=ft,
+    )
+
+    model_ckpt = "distilbert-base-uncased"
+    tokenizer = AutoTokenizer.from_pretrained(model_ckpt)
+
+    def tokenize(batch):
+        return tokenizer(batch["text"], padding=True, truncation=True)
+
+    helpdesk_encoded = dataset.map(tokenize, batched=True, batch_size=None)
+    helpdesk_encoded.set_format(
+        "torch", columns=["input_ids", "attention_mask", "label"]
+    )
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    num_labels = 3
+    model = AutoModelForSequenceClassification.from_pretrained(
+        model_ckpt, num_labels=num_labels
+    ).to(device)
+
+    config = AutoConfig.from_pretrained(
+        model_ckpt,
+        num_labels=len(class_names),
+        id2label={i: label for i, label in enumerate(class_names)},
+        label2id={label: i for i, label in enumerate(class_names)},
+    )
+
+    model.config = config
+
+    def compute_metrics(pred):
+        labels = pred.label_ids
+        preds = pred.predictions.argmax(-1)
+        f1 = f1_score(labels, preds, average="weighted")
+        acc = accuracy_score(labels, preds)
+        return {"accuracy": acc, "f1": f1}
+
+    batch_size = 2
+    logging_steps = len(helpdesk_encoded["train"]) // batch_size
+    model_name = "Venkatesh4342/distilbert-helpdesk-sentiment"
+    training_args = TrainingArguments(
+        output_dir=model_name,
+        num_train_epochs=6,
+        learning_rate=2e-5,
+        evaluation_strategy="steps",
+        eval_steps=100,
+        per_device_eval_batch_size=batch_size,
+        weight_decay=0.01,
+        save_steps=100,
+        save_total_limit=3,
+        load_best_model_at_end=True,
+        logging_steps=logging_steps,
+        gradient_checkpointing=True,
+        push_to_hub=False,
+    )
+
+    trainer = Trainer(
+        model=model,
+        args=training_args,
+        compute_metrics=compute_metrics,
+        train_dataset=helpdesk_encoded["train"],
+        eval_dataset=helpdesk_encoded["validation"],
+        tokenizer=tokenizer,
+    )
+
+    trainer.train()
+    trainer.save_model("fine_tuned_model")
+
+    onnx_model = ORTModelForSequenceClassification.from_pretrained(
+        "fine_tuned_model", export=True
+    )
+    quantizer = ORTQuantizer.from_pretrained(onnx_model)
+    dqconfig = AutoQuantizationConfig.avx512_vnni(is_static=False, per_channel=False)
+    model_quantized_path = quantizer.quantize(
+        save_dir="model",
+        quantization_config=dqconfig,
+    )
+    time.sleep(15)
+    shutil.rmtree("fine_tuned_model")
+    os.remove("train_help.csv")
+    os.remove("val_help.csv")

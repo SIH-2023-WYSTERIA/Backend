@@ -14,9 +14,10 @@ class S3:
             aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
         )
 
-    def upload_file(self, file, filename):
+    def upload_file(self, file_path, filename):
         try:
-            self.s3.upload_fileobj(file, os.getenv('S3_BUCKET_NAME'), filename)
+            with open(file_path, 'rb') as file:
+                self.s3.upload_fileobj(file, os.getenv('S3_BUCKET_NAME'), filename)
         except Exception as e:
             return False, str(e)
         return True, None

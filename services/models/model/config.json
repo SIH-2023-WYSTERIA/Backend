@@ -1,5 +1,5 @@
 {
-  "_name_or_path": "/tmp/tmpdv0xyc7x",
+  "_name_or_path": "/tmp/tmpwf43q3q7",
   "activation": "gelu",
   "architectures": [
     "DistilBertForSequenceClassification"
