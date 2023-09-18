@@ -54,6 +54,10 @@ class RegisterEmployee(BaseAuthAPI):
         # Check if the username already exists
         if self.db.employees.find_one({'employee_id': employee_id,'company_id':company_id}):
             return jsonify({'message': 'employee_id already exists'}), 400
+        
+        # Check if company_id is valid
+        if not self.db.companies.find_one({'company_id':company_id}):
+            return jsonify({'message': 'company_id does not exist'}), 400
 
         # Hash the password
         hashed_password = generate_password_hash(password, method='sha256')
