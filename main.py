@@ -29,4 +29,9 @@ def after_request(response):
 if __name__ == '__main__':
     certfile = './ssl_keys/cert.pem'
     keyfile = './ssl_keys/key.pem'
-    app.run(host='0.0.0.0', port=5000,ssl_context=(certfile, keyfile))
+
+    # For https
+    # app.run(host='0.0.0.0', port=5000,ssl_context=(certfile, keyfile))
+
+    # For http
+    app.run(host='0.0.0.0', port=5000)
