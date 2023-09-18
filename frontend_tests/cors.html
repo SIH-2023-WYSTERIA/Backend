@@ -1,0 +1,66 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>CORS Test</title>
+</head>
+<body>
+    <h1>CORS Test</h1>
+    <button id="sendRequestButton">Send CORS Request</button>
+    <p>Status: <span id="status">Not Sent</span></p>
+    <pre id="response"></pre>
+
+    <script>
+        var createCORSRequest = function (method, url) {
+            var xhr = new XMLHttpRequest();
+            if ("withCredentials" in xhr) {
+                // Most browsers.
+                xhr.open(method, url, true);
+            } else if (typeof XDomainRequest != "undefined") {
+                // IE8 & IE9
+                xhr = new XDomainRequest();
+                xhr.open(method, url);
+            } else {
+                // CORS not supported.
+                xhr = null;
+            }
+            return xhr;
+        };
+
+        var url = 'https://2489-2405-201-d006-11ff-8743-9386-f216-5ddf.ngrok-free.app/private/get_all_conversations';
+        var method = 'GET';
+        var xhr = createCORSRequest(method, url);
+
+        xhr.onload = function () {
+            // Success code goes here.
+            document.getElementById('status').textContent = 'Request Successful';
+            var responseText = xhr.responseText;
+            var contentType = xhr.getResponseHeader("content-type");
+
+            if (contentType && contentType.indexOf("application/json") !== -1) {
+                // If the response is JSON, pretty-print it.
+                document.getElementById('response').textContent = JSON.stringify(JSON.parse(responseText), null, 2);
+            } else {
+                // If the response is not JSON, display it as is.
+                document.getElementById('response').textContent = responseText;
+            }
+        };
+
+        xhr.onerror = function () {
+            // Error code goes here.
+            document.getElementById('status').textContent = 'Request Error';
+            document.getElementById('response').textContent = '';
+        };
+
+        xhr.setRequestHeader('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTY5NDY5Njg3OSwianRpIjoiYzkzNWE2NWItMzlmNS00N2ZjLTllYWEtMzcxZDQ1NmY0ZjdmIiwidHlwZSI6ImFjY2VzcyIsInN1YiI6eyJjb21wYW55X2lkIjoiM2ZlYWRmOTUtYWQ5NS00MWIyLTk0NTMtOTcyNTZhZmZlYTA4Iiwicm9sZSI6ImFkbWluIn0sIm5iZiI6MTY5NDY5Njg3OSwiZXhwIjoxNzI2MjMyODc5fQ.wfvTeOil1GkLluCBJCXyhLy4gZSoA_lheOKRH8HTG3w'); 
+        xhr.setRequestHeader("ngrok-skip-browser-warning", 'true');
+
+        document.getElementById('sendRequestButton').addEventListener('click', function () {
+            xhr.send();
+            document.getElementById('status').textContent = 'Sending Request...';
+            document.getElementById('response').textContent = ''; // Clear previous response
+        });
+    </script>
+</body>
+</html>
+
