@@ -31,6 +31,7 @@ if __name__ == '__main__':
     keyfile = './ssl_keys/key.pem'
 
     # For https
+    # Passphrase is "sih2023"
     # app.run(host='0.0.0.0', port=5000,ssl_context=(certfile, keyfile))
 
     # For http
