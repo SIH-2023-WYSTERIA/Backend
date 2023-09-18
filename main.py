@@ -27,4 +27,6 @@ def after_request(response):
     return response
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    certfile = './ssl_keys/cert.pem'
+    keyfile = './ssl_keys/key.pem'
+    app.run(host='0.0.0.0', port=5000,ssl_context=(certfile, keyfile))
