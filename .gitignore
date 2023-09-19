@@ -4,3 +4,4 @@ venv
 **/__pycache__/
 tests/
 services/models/Venkatesh4342/*
+req.txt

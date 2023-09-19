@@ -2,11 +2,12 @@ import uuid
 import os
 import tempfile
 from flask import jsonify, request
+from flask.views import MethodView
 from flask_jwt_extended import get_jwt_identity
 from werkzeug.utils import secure_filename
 from .base import AdminAPI, EmployeeAPI
 from dependencies import S3, MongoDB
-from services import Model_Inference
+from services import Model_Inference,Update_Employee_Stats
 
 ALLOWED_EXTENSIONS = ["mp3", "wav"]
 
@@ -73,18 +74,18 @@ class SendConversation(EmployeeAPI, S3, MongoDB):
             s3_url = self.generate_presigned_url(filename)
 
             employee = self.get_employee()
-            employee_id = employee['employee_id']
+            employee_email = employee['employee_email']
             company_id = employee['company_id']
             index = self.get_next_index()
             inference = Model_Inference(file_path)  # Ensure Model_Inference accepts a file path
 
-            _ = self.db.conversations.insert_one({'employee_id': employee_id, 
+            _ = self.db.conversations.insert_one({'employee_email': employee_email, 
                                                   'company_id' : company_id,
                                                   'stream_url': s3_url, 
                                                   'index':index,
                                                   'inference': inference}).inserted_id
 
-
+            Update_Employee_Stats(employee_email,inference["score"],inference["sentiment"])
             return jsonify({'message': 'File uploaded and processed successfully'}), 200
 
         finally:
@@ -93,16 +94,29 @@ class SendConversation(EmployeeAPI, S3, MongoDB):
             os.rmdir(temp_dir)
 
 
-class GetAllConversations(AdminAPI, MongoDB):
+class GetAllConversations(MethodView,MongoDB):
     def __init__(self):
         MongoDB.__init__(self)
 
     def get(self):
+        employee_email = request.args.get("employee_email")
+        company_id = request.args.get("company_id")
+        sentiment = request.args.get("sentiment")
+
+        # Create a filter dictionary based on the provided parameters
+        filter_dict = {}
+        if employee_email:
+            filter_dict["employee_email"] = employee_email
+        if company_id:
+            filter_dict["company_id"] = company_id
+        if sentiment:
+            filter_dict["inference.sentiment"] = sentiment  # Adjust the field name as per your MongoDB schema
+
         # Query the database to retrieve all conversations
-        conversations = list(self.db.conversations.find({}))
+        conversations = list(self.db.conversations.find(filter_dict))
         # Transform MongoDB documents to a list of dictionaries (JSON serializable)
         conversations_json = [
-            {"employee_id": conv["employee_id"], 
+            {"employee_email": conv["employee_email"], 
              "company_id": conv["company_id"], 
              "stream_url": conv["stream_url"],
              "inference":conv.get("inference", {})}

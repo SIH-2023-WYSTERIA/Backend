@@ -4,6 +4,14 @@ from flask.views import MethodView
 from flask_jwt_extended import create_access_token
 from werkzeug.security import generate_password_hash, check_password_hash
 from dependencies.db import MongoDB
+import re
+
+def checkEmailFormat(s):
+    pat = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b'
+    if re.match(pat,s):
+        return True
+    else:
+        return False
 
 
 class BaseAuthAPI(MethodView,MongoDB):
@@ -43,17 +51,20 @@ class RegisterCompany(BaseAuthAPI):
 class RegisterEmployee(BaseAuthAPI):
     def post(self):
         data = request.get_json()
-        employee_id = data.get('employee_id')
+        employee_email = data.get('employee_email')
         company_id = data.get('company_id')
         password = data.get('password')
         role = 'employee'
 
-        if not employee_id or not password or not company_id:
+        if not employee_email or not password or not company_id:
             return jsonify({'message': 'Username and password and company id are required'}), 400
+        
+        if not checkEmailFormat(employee_email):
+            return jsonify({'message': 'Email format invalid'}), 400
 
         # Check if the username already exists
-        if self.db.employees.find_one({'employee_id': employee_id,'company_id':company_id}):
-            return jsonify({'message': 'employee_id already exists'}), 400
+        if self.db.employees.find_one({'employee_email': employee_email,'company_id':company_id}):
+            return jsonify({'message': 'employee_email already exists'}), 400
         
         # Check if company_id is valid
         if not self.db.companies.find_one({'company_id':company_id}):
@@ -63,9 +74,16 @@ class RegisterEmployee(BaseAuthAPI):
         hashed_password = generate_password_hash(password, method='sha256')
 
         # Insert user data into the database
-        user_id = self.db.employees.insert_one({'employee_id': employee_id,'company_id':company_id , 'password': hashed_password, 'role':role}).inserted_id
+        user_id = self.db.employees.insert_one({'employee_email': employee_email,
+                                                'company_id':company_id , 
+                                                'password': hashed_password, 
+                                                'score':0,
+                                                'num_conversations':0,
+                                                'cumulative_score':0,
+                                                'average_sentiment':'Neutral',
+                                                'role':role}).inserted_id
 
-        return jsonify({'message': 'Employee registered successfully', 'employee_id': employee_id}), 201
+        return jsonify({'message': 'Employee registered successfully', 'employee_email': employee_email}), 201
 
 
 class CompanyLogin(BaseAuthAPI):
@@ -94,21 +112,19 @@ class EmployeeLogin(BaseAuthAPI):
     def post(self):
         data = request.get_json()
 
-        employee_id = data.get("employee_id")
-        company_id = data.get("company_id")
+        employee_email = data.get("employee_email")
         password = data.get("password")
 
-        employee = self.db.employees.find_one({'company_id': company_id,
-                                               'employee_id': employee_id})
+        employee = self.db.employees.find_one({'employee_email': employee_email})
 
         print(employee)
         if not employee or not check_password_hash(employee['password'], password):
-            return jsonify({'message': 'Invalid username or password'}), 401
+            return jsonify({'message': 'Invalid email or password'}), 401
 
         if check_password_hash(employee["password"],password):
             # Generate a JWT token with user identity and role
             access_token = create_access_token(
-                identity={"employee_id": employee["employee_id"],
+                identity={"employee_email": employee["employee_email"],
                           'company_id': employee["company_id"],
                           "role": employee["role"]}
             )

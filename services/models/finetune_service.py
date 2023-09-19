@@ -8,7 +8,7 @@ threshold = 1000
 
 def Finetune():
     max_index = client.db.conversations.find_one({}, sort=[("index", -1)])["index"]
-    if(max_index % threshold != 0):
+    if(max_index and max_index % threshold != 0):
         return
     documents = client.db.conversations.find().sort("index", -1).limit(threshold)
     csv_file_path = write_to_csv(documents)
