@@ -5,6 +5,7 @@ from flask_jwt_extended import create_access_token
 from werkzeug.security import generate_password_hash, check_password_hash
 from dependencies.db import MongoDB
 import re
+from .base import AdminAPI
 
 def checkEmailFormat(s):
     pat = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b'
@@ -48,16 +49,16 @@ class RegisterCompany(BaseAuthAPI):
 
         return jsonify({'message': 'Company registered successfully', 'company_id': company_id}), 201
     
-class RegisterEmployee(BaseAuthAPI):
+class RegisterEmployee(AdminAPI,MongoDB):
     def post(self):
         data = request.get_json()
         employee_email = data.get('employee_email')
-        company_id = data.get('company_id')
+        company_id = self.get_admin()['company_id']
         password = data.get('password')
         role = 'employee'
 
-        if not employee_email or not password or not company_id:
-            return jsonify({'message': 'Username and password and company id are required'}), 400
+        if not employee_email or not password :
+            return jsonify({'message': 'Username and password are required'}), 400
         
         if not checkEmailFormat(employee_email):
             return jsonify({'message': 'Email format invalid'}), 400
@@ -66,9 +67,6 @@ class RegisterEmployee(BaseAuthAPI):
         if self.db.employees.find_one({'employee_email': employee_email,'company_id':company_id}):
             return jsonify({'message': 'employee_email already exists'}), 400
         
-        # Check if company_id is valid
-        if not self.db.companies.find_one({'company_id':company_id}):
-            return jsonify({'message': 'company_id does not exist'}), 400
 
         # Hash the password
         hashed_password = generate_password_hash(password, method='sha256')
@@ -81,6 +79,9 @@ class RegisterEmployee(BaseAuthAPI):
                                                 'num_conversations':0,
                                                 'cumulative_score':0,
                                                 'average_sentiment':'Neutral',
+                                                'num_positive_conversations':0,
+                                                'num_neutral_conversations':0,
+                                                'num_negative_conversations':0,
                                                 'role':role}).inserted_id
 
         return jsonify({'message': 'Employee registered successfully', 'employee_email': employee_email}), 201

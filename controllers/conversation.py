@@ -94,26 +94,54 @@ class SendConversation(EmployeeAPI, S3, MongoDB):
             os.rmdir(temp_dir)
 
 
-class GetAllConversations(MethodView,MongoDB):
+class GetAllConversations(AdminAPI,MongoDB):
     def __init__(self):
         MongoDB.__init__(self)
 
     def get(self):
+        company_id = self.get_admin()["company_id"]
         employee_email = request.args.get("employee_email")
-        company_id = request.args.get("company_id")
+        sentiment = request.args.get("sentiment")
+
+        # Create a filter dictionary based on the provided parameters
+        filter_dict = {}
+        filter_dict["company_id"] = company_id
+        
+        if employee_email:
+            filter_dict["employee_email"] = employee_email
+        if sentiment:
+            filter_dict["inference.sentiment"] = sentiment  # Adjust the field name as per your MongoDB schema
+
+        # Query the database to retrieve all conversations
+        conversations = list(self.db.conversations.find(filter_dict).sort([("_id", -1)]))
+        # Transform MongoDB documents to a list of dictionaries (JSON serializable)
+        conversations_json = [
+            {"employee_email": conv["employee_email"], 
+             "company_id": conv["company_id"], 
+             "stream_url": conv["stream_url"],
+             "inference":conv.get("inference", {})}
+            for conv in conversations
+        ]
+
+        return jsonify({"conversations": conversations_json}), 200
+    
+class GetConversationsByEmail(EmployeeAPI,MongoDB):
+    def __init__(self):
+        MongoDB.__init__(self)
+
+    def get(self):
+        employee_email = self.get_employee()["employee_email"]
         sentiment = request.args.get("sentiment")
 
         # Create a filter dictionary based on the provided parameters
         filter_dict = {}
         if employee_email:
             filter_dict["employee_email"] = employee_email
-        if company_id:
-            filter_dict["company_id"] = company_id
         if sentiment:
             filter_dict["inference.sentiment"] = sentiment  # Adjust the field name as per your MongoDB schema
 
         # Query the database to retrieve all conversations
-        conversations = list(self.db.conversations.find(filter_dict))
+        conversations = list(self.db.conversations.find(filter_dict).sort([("_id", -1)]))
         # Transform MongoDB documents to a list of dictionaries (JSON serializable)
         conversations_json = [
             {"employee_email": conv["employee_email"], 

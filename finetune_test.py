@@ -1,14 +1,14 @@
 import os
 import tempfile
 import uuid
-from dependencies.db import MongoDB
+from dependencies import MongoDB
 
-from .model_service import finetune
+from services.models.model_service import finetune
 import csv
 
 client = MongoDB()
 
-threshold = 1000
+threshold = 9
 
 def Finetune():
     latest_conv = client.db.conversations.find_one({}, sort=[("index", -1)])
@@ -18,6 +18,7 @@ def Finetune():
         return
     print("starting finetuning")
     documents = list(client.db.conversations.find().sort("index", -1).limit(threshold))
+    # print(documents)
     csv_file_path = write_to_csv(documents)
     finetune(csv_file_path)
 
@@ -48,3 +49,5 @@ def write_to_csv(documents):
     finally:
         print("returned file")
 
+if '__main__' == __name__:
+    Finetune()

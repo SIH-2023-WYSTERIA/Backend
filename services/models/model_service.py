@@ -218,9 +218,7 @@ def summerization_pipeline(s2t_output, model_name):
 
 
 quant_model = ORTModelForSequenceClassification.from_pretrained("services/models/model")
-quant_tokenizer = AutoTokenizer.from_pretrained(
-    "Venkatesh4342/distilbert-helpdesk-sentiment"
-)
+quant_tokenizer = AutoTokenizer.from_pretrained("services/models/model")
 
 
 def classification(summerized_op, quant_model, quant_tokenizer):
@@ -355,3 +353,4 @@ def finetune(filepath):
     shutil.rmtree("fine_tuned_model")
     os.remove("train_help.csv")
     os.remove("val_help.csv")
+
