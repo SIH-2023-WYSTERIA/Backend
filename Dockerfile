@@ -19,7 +19,7 @@ WORKDIR /app
 COPY . .
 
 # Install python packages from requirements.txt
-RUN cat requirements.txt | sed -e '/^\s*#.*$/d' -e '/^\s*$/d' | xargs -n 1 python -m pip install
+RUN cat requirements.txt | sed -e '/^\s*#.*$/d' -e '/^\s*$/d' | xargs -n 1 python3 -m pip install
 
 # Set the entrypoint
 # Run main.py when the container launches
