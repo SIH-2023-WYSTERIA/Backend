@@ -1,3 +1,4 @@
+import datetime
 import uuid
 import os
 import tempfile
@@ -11,7 +12,10 @@ from services import Model_Inference,Update_Employee_Stats
 
 ALLOWED_EXTENSIONS = ["mp3", "wav"]
 
+import pytz
 
+# Define the Indian time zone
+indian_tz = pytz.timezone('Asia/Kolkata')
 
 class SendConversation(EmployeeAPI, S3, MongoDB):
     def __init__(self):
@@ -83,6 +87,8 @@ class SendConversation(EmployeeAPI, S3, MongoDB):
                                                   'company_id' : company_id,
                                                   'stream_url': s3_url, 
                                                   'index':index,
+                                                  'date':str(datetime.datetime.now(indian_tz).date()),
+                                                  'time':str(datetime.datetime.now(indian_tz).time().strftime("%H:%M:%S")),
                                                   'inference': inference}).inserted_id
 
             Update_Employee_Stats(employee_email,inference["score"],inference["sentiment"])
@@ -92,6 +98,19 @@ class SendConversation(EmployeeAPI, S3, MongoDB):
             # Delete the temporary file and directory after processing
             os.remove(file_path)
             os.rmdir(temp_dir)
+
+
+def extract_date_from_objectid(object_id):
+    # Extract the date from the ObjectId's generation_time
+    date = object_id.generation_time.strftime("%d-%m-%Y")
+    
+    return date
+
+def extract_time_from_objectid(object_id):
+    # Extract the time from the ObjectId's generation_time
+    time = object_id.generation_time.strftime("%H:%M")
+    
+    return time
 
 
 class GetAllConversations(AdminAPI,MongoDB):
@@ -119,7 +138,9 @@ class GetAllConversations(AdminAPI,MongoDB):
             {"employee_email": conv["employee_email"], 
              "company_id": conv["company_id"], 
              "stream_url": conv["stream_url"],
-             "inference":conv.get("inference", {})}
+             "inference":conv.get("inference", {}),
+             "date":conv['date'],
+             "time":conv['time']}
             for conv in conversations
         ]
 
