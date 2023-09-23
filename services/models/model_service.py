@@ -217,8 +217,8 @@ def summerization_pipeline(s2t_output, model_name):
     return pipe_out[0]["summary_text"]
 
 
-quant_model = ORTModelForSequenceClassification.from_pretrained("services/models/model")
-quant_tokenizer = AutoTokenizer.from_pretrained("services/models/model")
+quant_model = ORTModelForSequenceClassification.from_pretrained("Venkatesh4342/quantized-helpdesk")
+quant_tokenizer = AutoTokenizer.from_pretrained("Venkatesh4342/quantized-helpdesk")
 
 
 def classification(summerized_op, quant_model, quant_tokenizer):
@@ -348,6 +348,14 @@ def finetune(filepath):
     model_quantized_path = quantizer.quantize(
         save_dir="model",
         quantization_config=dqconfig,
+    )
+    from huggingface_hub import HfApi
+    api = HfApi()
+
+    api.upload_folder(
+        folder_path="model",
+        repo_id="Venkatesh4342/quantized-helpdesk",
+        repo_type="model"
     )
     time.sleep(15)
     shutil.rmtree("fine_tuned_model")

@@ -5,7 +5,7 @@ from controllers.auth import (
     RegisterCompany,
     RegisterEmployee,
 )
-from controllers.employee import GetEmployee, GetEmployeeStats
+from controllers.employee import GetEmployee
 
 public_bp = Blueprint("public", __name__, url_prefix="/public")
 

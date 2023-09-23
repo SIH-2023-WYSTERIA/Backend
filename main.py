@@ -1,4 +1,5 @@
 from datetime import timedelta
+import subprocess
 from flask import Flask , request
 from flask_jwt_extended import JWTManager
 from flask_cors import CORS
@@ -12,6 +13,7 @@ from services import Finetune
 load_dotenv()
 app = Flask(__name__)
 CORS(app,origins='*')
+subprocess.run(["huggingface-cli", "login", "--token", os.getenv('HUGGINGFACE_TOKEN')])
 app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY')  # Replace with your secret key
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(days=365) 
 jwt = JWTManager(app)
@@ -20,11 +22,6 @@ jwt = JWTManager(app)
 app.register_blueprint(public_bp)
 app.register_blueprint(private_bp)
 
-@app.after_request
-def after_request(response):
-    if request.endpoint == 'private.send_conversation':
-        Finetune()
-    return response
 
 if __name__ == '__main__':
     certfile = './ssl_keys/cert.pem'

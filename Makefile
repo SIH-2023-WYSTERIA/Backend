@@ -1,3 +1,6 @@
+# Specify Bash as the shell
+SHELL := /bin/bash
+
 # Define the name of your virtual environment
 VENV_NAME = venv
 
@@ -9,15 +12,15 @@ else
 endif
 
 .PHONY: all
-all: venv run
+all: run
 
-# Create a virtual environment
+# Run main.py after checking if the virtual environment is active
+run:
+	@if [ -z "$$VIRTUAL_ENV" ]; then $(VENV_ACTIVATE) && python3 main.py; else python3 main.py; fi
+
+# Create a virtual environment if it doesn't exist
 venv:
-	python3 -m venv $(VENV_NAME)
-
-# Activate the virtual environment and run main.py
-run: venv
-	$(VENV_ACTIVATE) && python3 main.py
+	@if [ ! -d $(VENV_NAME) ]; then python3 -m venv $(VENV_NAME); fi
 
 # Clean up the virtual environment
 clean:
@@ -27,7 +30,6 @@ clean:
 help:
 	@echo "Available targets:"
 	@echo "  venv   - Create a virtual environment"
-	@echo "  run    - Activate the virtual environment and run main.py"
+	@echo "  run    - Activate the virtual environment (if not active) and run main.py"
 	@echo "  clean  - Remove the virtual environment"
 	@echo "  help   - Display this help message"
-

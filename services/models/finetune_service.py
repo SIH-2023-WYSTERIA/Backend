@@ -10,14 +10,7 @@ client = MongoDB()
 
 threshold = 1000
 
-def Finetune():
-    latest_conv = client.db.conversations.find_one({}, sort=[("index", -1)])
-    if latest_conv:
-        max_index = latest_conv["index"]
-    if(max_index and max_index % threshold != 0):
-        return
-    print("starting finetuning")
-    documents = list(client.db.conversations.find().sort("index", -1).limit(threshold))
+def Finetune(documents):
     csv_file_path = write_to_csv(documents)
     finetune(csv_file_path)
 
@@ -36,8 +29,8 @@ def write_to_csv(documents):
 
             # Iterate through the top thousand documents and write each document to the CSV file
             for document in documents:
-                text = document.get("inference")["summary"]  
-                label = document.get("inference")["sentiment"]  
+                text = document["text"]  
+                label = document["corrected_label"]  
 
                 # Write the data to the CSV file
                 csv_writer.writerow([text, label])
