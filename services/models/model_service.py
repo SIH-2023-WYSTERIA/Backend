@@ -49,7 +49,7 @@ from datasets import Audio, load_dataset, Features, Value, ClassLabel
 
 processor = WhisperProcessor.from_pretrained("Venkatesh4342/whisper-small-en-hi")
 forced_decoder_ids = processor.get_decoder_prompt_ids(
-    language="english", task="transcribe"
+    language="english", task="translate"
 )
 
 tokenizer = WhisperTokenizer.from_pretrained("Venkatesh4342/whisper-small-en-hi", language="english", task="transcribe")

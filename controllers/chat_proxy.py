@@ -3,7 +3,7 @@ from flask.views import MethodView
 import requests
 from dependencies.db import MongoDB
 
-URL = "https://2112-35-224-121-60.ngrok-free.app/chat"
+URL = "http://0c7e-34-125-145-147.ngrok-free.app/chat"
 
 class Chat(MethodView):
     def post(self):
@@ -14,10 +14,7 @@ class Chat(MethodView):
         response = requests.post(URL, json={"query": query})
         print(response.text)
 
-        # Access the JSON content of the response
         response_data = response.json()
-
-        # Return a valid JSON response
         return jsonify({'answer': response_data.get('answer', 'N/A')})
 
 class ChatFinetune(MethodView,MongoDB):

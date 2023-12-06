@@ -9,7 +9,7 @@ from flask_jwt_extended import get_jwt_identity
 from werkzeug.utils import secure_filename
 from .base import AdminAPI, EmployeeAPI
 from dependencies import S3, MongoDB
-from services import Model_Inference, Update_Employee_Stats, Finetune
+from services import Model_Inference, Update_Employee_Stats, Finetune, model_proxy
 import pytz
 
 ALLOWED_EXTENSIONS = ["mp3", "wav"]
