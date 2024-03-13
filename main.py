@@ -24,8 +24,8 @@ app.register_blueprint(private_bp)
 
 
 if __name__ == '__main__':
-    certfile = './ssl_keys/cert.pem'
-    keyfile = './ssl_keys/key.pem'
+    # certfile = './ssl_keys/cert.pem'
+    # keyfile = './ssl_keys/key.pem'
 
     # For https
     # Passphrase is "sih2023"
