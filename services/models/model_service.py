@@ -26,7 +26,7 @@ diarization_pipeline = Pipeline.from_pretrained(
     "pyannote/speaker-diarization@2.1",
     use_auth_token="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",
 )
-mport torch
+import torch
 import onnxruntime as rt
 providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
 session = rt.InferenceSession("yolo.onnx", providers=providers)
