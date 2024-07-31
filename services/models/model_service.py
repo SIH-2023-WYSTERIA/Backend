@@ -39,7 +39,6 @@ diarization_pipeline = Pipeline.from_pretrained(
     use_auth_token="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",
 )
 # import onnxruntime as rt
-providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
 # session = rt.InferenceSession("yolo.onnx", providers=providers)
 # from optimum.onnxruntime import ORTModelForSequenceClassification
 # from optimum.onnxruntime import ORTQuantizer, ORTModelForSequenceClassification
