@@ -1,3 +1,16 @@
+from datasets import Audio, load_dataset, Features, Value, ClassLabel
+from transformers import (
+    Trainer,
+    TrainingArguments,
+    AutoModelForSequenceClassification,
+    AutoConfig,
+    AutoTokenizer,
+    WhisperProcessor,
+    WhisperForConditionalGeneration,
+    WhisperFeatureExtractor,
+    WhisperTokenizer,
+    WhisperProcessor,
+)
 import os
 import shutil
 
@@ -20,35 +33,21 @@ import time
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-from pyannote.audio import Pipeline
 
 diarization_pipeline = Pipeline.from_pretrained(
     "pyannote/speaker-diarization@2.1",
     use_auth_token="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",
 )
-import torch
-import onnxruntime as rt
+# import onnxruntime as rt
 providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
-session = rt.InferenceSession("yolo.onnx", providers=providers)
-from optimum.onnxruntime import ORTModelForSequenceClassification
-from optimum.onnxruntime import ORTQuantizer, ORTModelForSequenceClassification
-from optimum.onnxruntime.configuration import AutoQuantizationConfig
+# session = rt.InferenceSession("yolo.onnx", providers=providers)
+# from optimum.onnxruntime import ORTModelForSequenceClassification
+# from optimum.onnxruntime import ORTQuantizer, ORTModelForSequenceClassification
+# from optimum.onnxruntime.configuration import AutoQuantizationConfig
 
-from transformers import (
-    Trainer,
-    TrainingArguments,
-    AutoModelForSequenceClassification,
-    AutoConfig,
-    AutoTokenizer,
-    WhisperProcessor,
-    WhisperForConditionalGeneration,
-    WhisperFeatureExtractor,
-    WhisperTokenizer,
-    WhisperProcessor,
-)
-from datasets import Audio, load_dataset, Features, Value, ClassLabel
 
-processor = WhisperProcessor.from_pretrained("Venkatesh4342/whisper-small-en-hi")
+processor = WhisperProcessor.from_pretrained(
+    "Venkatesh4342/whisper-small-en-hi")
 forced_decoder_ids = processor.get_decoder_prompt_ids(
     language="english", task="transcribe"
 )
@@ -106,7 +105,8 @@ def preprocess(inputs):
             ).numpy()
 
     if not isinstance(inputs, np.ndarray):
-        raise ValueError(f"We expect a numpy ndarray as input, got `{type(inputs)}`")
+        raise ValueError(
+            f"We expect a numpy ndarray as input, got `{type(inputs)}`")
     if len(inputs.shape) != 1:
         raise ValueError(
             "We expect a single channel audio input for ASRDiarizePipeline"
@@ -198,9 +198,10 @@ def speech2text_pipeline(input, diarization_pipeline, asr_pipeline):
             )
         else:
             for i in range(upto_idx + 1):
-                segmented_preds.append({"speaker": segment["speaker"], **transcript[i]})
-        transcript = transcript[upto_idx + 1 :]
-        end_timestamps = end_timestamps[upto_idx + 1 :]
+                segmented_preds.append(
+                    {"speaker": segment["speaker"], **transcript[i]})
+        transcript = transcript[upto_idx + 1:]
+        end_timestamps = end_timestamps[upto_idx + 1:]
 
     conv = []
     for i, sub in enumerate(segmented_preds):
@@ -221,8 +222,10 @@ def summerization_pipeline(s2t_output, model_name):
     return pipe_out[0]["summary_text"]
 
 
-quant_model = ORTModelForSequenceClassification.from_pretrained("Venkatesh4342/quantized-helpdesk")
-quant_tokenizer = AutoTokenizer.from_pretrained("Venkatesh4342/quantized-helpdesk")
+quant_model = AutoModelForSequenceClassification.from_pretrained(
+    "Venkatesh4342/xlm-roberta-helpdesk-sentiment")
+quant_tokenizer = AutoTokenizer.from_pretrained(
+    "Venkatesh4342/xlm-roberta-helpdesk-sentiment")
 
 
 def classification(summerized_op, quant_model, quant_tokenizer):
@@ -239,13 +242,14 @@ def classification(summerized_op, quant_model, quant_tokenizer):
 def Model_Inference(file):
     start = time.time()
     data = {}
-    speech2text_output = speech2text_pipeline(file, diarization_pipeline, asr_pipeline)
+    speech2text_output = speech2text_pipeline(
+        file, diarization_pipeline, asr_pipeline)
     summerized_output = summerization_pipeline(speech2text_output, model_name)
     sentiment = classification(summerized_output, quant_model, quant_tokenizer)
 
     data.update(
         {
-            "conversation_transcript":speech2text_output,
+            "conversation_transcript": speech2text_output,
             "summary": summerized_output,
             "sentiment": sentiment[0]["label"],
             "score": sentiment[0]["score"],
@@ -344,25 +348,24 @@ def finetune(filepath):
     trainer.train()
     trainer.save_model("fine_tuned_model")
 
-    onnx_model = ORTModelForSequenceClassification.from_pretrained(
-        "fine_tuned_model", export=True
-    )
-    quantizer = ORTQuantizer.from_pretrained(onnx_model)
-    dqconfig = AutoQuantizationConfig.avx512_vnni(is_static=False, per_channel=False)
-    model_quantized_path = quantizer.quantize(
-        save_dir="model",
-        quantization_config=dqconfig,
-    )
-    from huggingface_hub import HfApi
-    api = HfApi()
+    # onnx_model = ORTModelForSequenceClassification.from_pretrained(
+    #     "fine_tuned_model", export=True
+    # )
+    # quantizer = ORTQuantizer.from_pretrained(onnx_model)
+    # dqconfig = AutoQuantizationConfig.avx512_vnni(is_static=False, per_channel=False)
+    # model_quantized_path = quantizer.quantize(
+    #     save_dir="model",
+    #     quantization_config=dqconfig,
+    # )
+    # from huggingface_hub import HfApi
+    # api = HfApi()
 
-    api.upload_folder(
-        folder_path="model",
-        repo_id="Venkatesh4342/quantized-helpdesk",
-        repo_type="model"
-    )
-    time.sleep(15)
-    shutil.rmtree("fine_tuned_model")
-    os.remove("train_help.csv")
-    os.remove("val_help.csv")
-
+    # api.upload_folder(
+    #     folder_path="model",
+    #     repo_id="Venkatesh4342/quantized-helpdesk",
+    #     repo_type="model"
+    # )
+    # time.sleep(15)
+    # shutil.rmtree("fine_tuned_model")
+    # os.remove("train_help.csv")
+    # os.remove("val_help.csv")
