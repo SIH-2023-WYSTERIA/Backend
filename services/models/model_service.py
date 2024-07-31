@@ -24,7 +24,7 @@ from pyannote.audio import Pipeline
 
 diarization_pipeline = Pipeline.from_pretrained(
     "pyannote/speaker-diarization@2.1",
-    use_auth_token="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",
+    use_auth_token="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",
 )
 
 from optimum.onnxruntime import ORTModelForSequenceClassification
@@ -118,7 +118,8 @@ def preprocess(inputs):
 
 def speech2text_pipeline(input, diarization_pipeline, asr_pipeline):
     inputs, diarizer_inputs = preprocess(input)
-    diarization_pipeline
+    diarization_pipeline.to(torch.device(device))
+
     diarizer_output = diarization_pipeline(
         {"waveform": diarizer_inputs, "sample_rate": sampling_rate}, num_speakers=2
     )
