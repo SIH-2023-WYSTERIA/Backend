@@ -118,7 +118,7 @@ def preprocess(inputs):
 
 def speech2text_pipeline(input, diarization_pipeline, asr_pipeline):
     inputs, diarizer_inputs = preprocess(input)
-    diarization_pipeline.to(torch.device(device))
+    #diarization_pipeline.to(torch.device(device))
     diarizer_output = diarization_pipeline(
         {"waveform": diarizer_inputs, "sample_rate": sampling_rate}, num_speakers=2
     )
