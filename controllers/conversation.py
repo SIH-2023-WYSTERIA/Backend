@@ -77,11 +77,11 @@ class SendConversation(EmployeeAPI, S3, MongoDB):
         temp_dir = tempfile.mkdtemp()
 
         try:
-            filename = str(uuid.uuid4()) + "." + file.filename.rsplit(".", 1)[1].lower()
-            file_path = os.path.join(temp_dir, filename)
+            unique_filename = str(uuid.uuid4()) + "." + filename.rsplit(".", 1)[1].lower()
+            file_path = os.path.join(temp_dir, unique_filename)
             file.save(file_path)
 
-            success, error = self.upload_file(file_path, filename)
+            success, error = self.upload_file(file_path, unique_filename)
 
             if not success:
                 return (
@@ -89,7 +89,7 @@ class SendConversation(EmployeeAPI, S3, MongoDB):
                     500,
                 )
 
-            s3_url = self.generate_presigned_url(filename)
+            s3_url = self.generate_presigned_url(unique_filename)
             index = self.get_next_index()
             inference = Model_Inference(file_path)
 
