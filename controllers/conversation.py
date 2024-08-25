@@ -70,8 +70,6 @@ class SendConversation(EmployeeAPI, S3, MongoDB):
         if file.filename == "":
             return jsonify({"message": "No selected file"}), 400
 
-        if not allowed_file(file.filename):
-               return jsonify({"message": "Invalid file extension. Only .wav or .mp3 files are allowed"}), 400
 
         filename = secure_filename(file.filename)
 
