@@ -54,9 +54,9 @@ class SendConversation(EmployeeAPI, S3, MongoDB):
 
     def post(self):
         # Extract employee details from the request body
-        data = request.get_json()
-        employee_email = data.get("employee_email")
-        company_id = data.get("company_id")
+        employee_email = request.form.get("employee_email")
+        company_id = request.form.get("company_id")
+
 
         if not employee_email or not company_id:
             return jsonify({"message": "Employee email and company ID are required"}), 400
