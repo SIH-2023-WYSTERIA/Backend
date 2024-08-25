@@ -5,7 +5,6 @@ import tempfile
 from bson import ObjectId
 from flask import jsonify, request
 from flask.views import MethodView
-from flask_jwt_extended import get_jwt_identity
 from werkzeug.utils import secure_filename
 from .base import AdminAPI, EmployeeAPI
 from dependencies import S3, MongoDB
@@ -32,10 +31,8 @@ ALLOWD_FINETUNE_TAGS = [
     "theme_park_tickets",
 ]
 
-
 # Define the Indian time zone
 indian_tz = pytz.timezone("Asia/Kolkata")
-
 
 class SendConversation(EmployeeAPI, S3, MongoDB):
     def __init__(self):
@@ -47,7 +44,6 @@ class SendConversation(EmployeeAPI, S3, MongoDB):
             "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
         )
 
-    # Function to get the next available index
     def get_next_index(self):
         last_document = self.db.conversations.find_one(sort=[("index", -1)])
         if last_document:
@@ -55,17 +51,23 @@ class SendConversation(EmployeeAPI, S3, MongoDB):
         return 1  # If no documents exist, start from 1
 
     def post(self):
+        # Extract employee details from the request body
+        data = request.get_json()
+        employee_email = data.get("employee_email")
+        company_id = data.get("company_id")
+
+        if not employee_email or not company_id:
+            return jsonify({"message": "Employee email and company ID are required"}), 400
+
         # Check if a file was uploaded in the request
         if "file" not in request.files:
             return jsonify({"message": "No file part"}), 400
 
         file = request.files["file"]
 
-        # Check if the file is empty
         if file.filename == "":
             return jsonify({"message": "No selected file"}), 400
 
-        # Check if the file has a valid extension
         if not self.allowed_file(file.filename):
             return (
                 jsonify(
@@ -76,18 +78,13 @@ class SendConversation(EmployeeAPI, S3, MongoDB):
                 400,
             )
 
-        # Create a temporary directory to store the file
         temp_dir = tempfile.mkdtemp()
 
         try:
-            # Securely save the file with a random name to avoid conflicts
             filename = str(uuid.uuid4()) + "." + file.filename.rsplit(".", 1)[1].lower()
             file_path = os.path.join(temp_dir, filename)
-
-            # Save the uploaded file to the temporary location
             file.save(file_path)
 
-            # Upload the file using the inherited S3Manager
             success, error = self.upload_file(file_path, filename)
 
             if not success:
@@ -96,16 +93,9 @@ class SendConversation(EmployeeAPI, S3, MongoDB):
                     500,
                 )
 
-            # Generate the S3 URL for the uploaded file
             s3_url = self.generate_presigned_url(filename)
-
-            employee = self.get_employee()
-            employee_email = employee["employee_email"]
-            company_id = employee["company_id"]
             index = self.get_next_index()
-            inference = Model_Inference(
-                file_path
-            )  # Ensure Model_Inference accepts a file path
+            inference = Model_Inference(file_path)
 
             _ = self.db.conversations.insert_one(
                 {
@@ -114,63 +104,39 @@ class SendConversation(EmployeeAPI, S3, MongoDB):
                     "stream_url": s3_url,
                     "index": index,
                     "date": str(datetime.datetime.now(indian_tz).date()),
-                    "time": str(
-                        datetime.datetime.now(indian_tz).time().strftime("%H:%M:%S")
-                    ),
+                    "time": str(datetime.datetime.now(indian_tz).time().strftime("%H:%M:%S")),
                     "inference": inference,
                 }
             ).inserted_id
 
-            Update_Employee_Stats(
-                employee_email, inference["score"], inference["sentiment"]
-            )
+            Update_Employee_Stats(employee_email, inference["score"], inference["sentiment"])
             return jsonify({"message": "File uploaded and processed successfully"}), 200
 
         finally:
-            # Delete the temporary file and directory after processing
             os.remove(file_path)
             os.rmdir(temp_dir)
-
-
-def extract_date_from_objectid(object_id):
-    # Extract the date from the ObjectId's generation_time
-    date = object_id.generation_time.strftime("%d-%m-%Y")
-
-    return date
-
-
-def extract_time_from_objectid(object_id):
-    # Extract the time from the ObjectId's generation_time
-    time = object_id.generation_time.strftime("%H:%M")
-
-    return time
-
 
 class GetAllConversations(AdminAPI, MongoDB):
     def __init__(self):
         MongoDB.__init__(self)
 
     def get(self):
-        company_id = self.get_admin()["company_id"]
+        data = request.get_json()
+        company_id = data.get("company_id")
+
+        if not company_id:
+            return jsonify({"message": "Company ID is required"}), 400
+
         employee_email = request.args.get("employee_email")
         sentiment = request.args.get("sentiment")
 
-        # Create a filter dictionary based on the provided parameters
-        filter_dict = {}
-        filter_dict["company_id"] = company_id
-
+        filter_dict = {"company_id": company_id}
         if employee_email:
             filter_dict["employee_email"] = employee_email
         if sentiment:
-            filter_dict[
-                "inference.sentiment"
-            ] = sentiment  # Adjust the field name as per your MongoDB schema
+            filter_dict["inference.sentiment"] = sentiment
 
-        # Query the database to retrieve all conversations
-        conversations = list(
-            self.db.conversations.find(filter_dict).sort([("_id", -1)])
-        )
-        # Transform MongoDB documents to a list of dictionaries (JSON serializable)
+        conversations = list(self.db.conversations.find(filter_dict).sort([("_id", -1)]))
         conversations_json = [
             {
                 "employee_email": conv["employee_email"],
@@ -185,29 +151,24 @@ class GetAllConversations(AdminAPI, MongoDB):
 
         return jsonify({"conversations": conversations_json}), 200
 
-
 class GetConversationsByEmail(EmployeeAPI, MongoDB):
     def __init__(self):
         MongoDB.__init__(self)
 
     def get(self):
-        employee_email = self.get_employee()["employee_email"]
+        data = request.get_json()
+        employee_email = data.get("employee_email")
+
+        if not employee_email:
+            return jsonify({"message": "Employee email is required"}), 400
+
         sentiment = request.args.get("sentiment")
 
-        # Create a filter dictionary based on the provided parameters
-        filter_dict = {}
-        if employee_email:
-            filter_dict["employee_email"] = employee_email
+        filter_dict = {"employee_email": employee_email}
         if sentiment:
-            filter_dict[
-                "inference.sentiment"
-            ] = sentiment  # Adjust the field name as per your MongoDB schema
+            filter_dict["inference.sentiment"] = sentiment
 
-        # Query the database to retrieve all conversations
-        conversations = list(
-            self.db.conversations.find(filter_dict).sort([("_id", -1)])
-        )
-        # Transform MongoDB documents to a list of dictionaries (JSON serializable)
+        conversations = list(self.db.conversations.find(filter_dict).sort([("_id", -1)]))
         conversations_json = [
             {
                 "employee_email": conv["employee_email"],
@@ -220,12 +181,10 @@ class GetConversationsByEmail(EmployeeAPI, MongoDB):
 
         return jsonify({"conversations": conversations_json}), 200
 
-
 class SendFinetuneData(EmployeeAPI, MongoDB):
     def __init__(self):
         MongoDB.__init__(self)
 
-    # Function to get the next available index
     def get_next_index(self):
         last_document = self.db.finetuning_data.find_one(sort=[("index", -1)])
         if last_document:
@@ -234,8 +193,12 @@ class SendFinetuneData(EmployeeAPI, MongoDB):
 
     def post(self):
         data = request.get_json()
-        employee_email = self.get_employee()["employee_email"]
-        company_id = self.get_employee()["company_id"]
+        employee_email = data.get("employee_email")
+        company_id = data.get("company_id")
+
+        if not employee_email or not company_id:
+            return jsonify({"message": "Employee email and company ID are required"}), 400
+
         conversation_summary = data.get("conversation_summary")
         corrected_sentiment = data.get("corrected_sentiment")
         tags = data.get("tags", [])
@@ -256,9 +219,7 @@ class SendFinetuneData(EmployeeAPI, MongoDB):
                 "company_id": company_id,
                 "index": self.get_next_index(),
                 "date": str(datetime.datetime.now(indian_tz).date()),
-                "time": str(
-                    datetime.datetime.now(indian_tz).time().strftime("%H:%M:%S")
-                ),
+                "time": str(datetime.datetime.now(indian_tz).time().strftime("%H:%M:%S")),
                 "conversation_summary": conversation_summary,
                 "corrected_sentiment": corrected_sentiment,
                 "tags": tags,
@@ -267,14 +228,17 @@ class SendFinetuneData(EmployeeAPI, MongoDB):
 
         return jsonify({"message": "updated finetuning data"}), 200
 
-
 class GetFinetuneData(AdminAPI, MongoDB):
     def __init__(self):
         MongoDB.__init__(self)
 
     def post(self):
-        company_id = self.get_admin()["company_id"]
         data = request.get_json()
+        company_id = data.get("company_id")
+
+        if not company_id:
+            return jsonify({"message": "Company ID is required"}), 400
+
         tags = data.get("tags", [])
         start_date_str = request.args.get("start_date")
         end_date_str = request.args.get("end_date")
@@ -284,6 +248,7 @@ class GetFinetuneData(AdminAPI, MongoDB):
             num = 10000
         else:
             num = int(num)
+
         if not tags:
             tags = ALLOWD_FINETUNE_TAGS
         for tag in tags:
@@ -301,7 +266,6 @@ class GetFinetuneData(AdminAPI, MongoDB):
             }
 
         filtered_documents = list(self.db.finetuning_data.find(filter_dict).sort('_id', -1).limit(num))
-
 
         finetune_data = [
             {
@@ -316,14 +280,17 @@ class GetFinetuneData(AdminAPI, MongoDB):
 
         return jsonify({"finetune_data": finetune_data}), 200
 
-
 class FinetuneData(AdminAPI, MongoDB):
     def __init__(self):
         MongoDB.__init__(self)
 
     def post(self):
-        company_id = self.get_admin()["company_id"]
         data = request.get_json()
+        company_id = data.get("company_id")
+
+        if not company_id:
+            return jsonify({"message": "Company ID is required"}), 400
+
         tags = data.get("tags", [])
         start_date_str = request.args.get("start_date")
         end_date_str = request.args.get("end_date")
@@ -333,6 +300,7 @@ class FinetuneData(AdminAPI, MongoDB):
             num = 10000
         else:
             num = int(num)
+
         if not tags:
             tags = ALLOWD_FINETUNE_TAGS
         for tag in tags:
@@ -350,12 +318,12 @@ class FinetuneData(AdminAPI, MongoDB):
             }
 
         filtered_documents = list(self.db.finetuning_data.find(filter_dict).sort('_id', -1).limit(num))
-        if(len(filtered_documents)<1000):
+        if len(filtered_documents) < 1000:
             return jsonify({"error":"number of data rows must be greater than 1000"}), 400
-        
+
         try:
             Finetune(filtered_documents)
         except Exception as e:
-            return jsonify({"error",str(e)}), 400
+            return jsonify({"error": str(e)}), 400
 
         return jsonify({"message": "finetuned successfully"}), 200
