@@ -11,7 +11,9 @@ from dependencies import S3, MongoDB
 from services import Model_Inference, Update_Employee_Stats, Finetune
 import pytz
 
-ALLOWED_EXTENSIONS = ["mp3", "wav"]
+ALLOWED_EXTENSIONS = {"mp3", "wav"}
+
+
 ALLOWD_FINETUNE_TAGS = [
     "generic",
     "hotel_booking",
@@ -67,6 +69,11 @@ class SendConversation(EmployeeAPI, S3, MongoDB):
 
         if file.filename == "":
             return jsonify({"message": "No selected file"}), 400
+
+        if not allowed_file(file.filename):
+        return jsonify({"message": "Invalid file extension. Only .wav or .mp3 files are allowed"}), 400
+
+        filename = secure_filename(file.filename)
 
 
         temp_dir = tempfile.mkdtemp()
