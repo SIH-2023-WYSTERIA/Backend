@@ -68,15 +68,6 @@ class SendConversation(EmployeeAPI, S3, MongoDB):
         if file.filename == "":
             return jsonify({"message": "No selected file"}), 400
 
-        if not self.allowed_file(file.filename):
-            return (
-                jsonify(
-                    {
-                        "message": "Invalid file extension. Only .wav or .mp3 files are allowed"
-                    }
-                ),
-                400,
-            )
 
         temp_dir = tempfile.mkdtemp()
 
