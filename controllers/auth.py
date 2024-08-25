@@ -52,7 +52,7 @@ class RegisterEmployee(AdminAPI,MongoDB):
     def post(self):
         data = request.get_json()
         employee_email = data.get('employee_email')
-        company_id = self.get_admin()['company_id']
+        company_id = data.get('company_id')
         password = data.get('password')
         role = 'employee'
 
