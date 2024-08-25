@@ -11,8 +11,9 @@ class GetEmployee(AdminAPI, MongoDB):
         MongoDB.__init__(self)
 
     def get(self):
-        employee_email = request.args.get("employee_email")
-        company_id = self.get_admin()["company_id"]
+        data = request.get_json()
+        employee_email = data.get("employee_email")
+        company_id = data.get("company_id")
 
         # Create a filter dictionary based on the provided parameters
         filter_dict = {}
