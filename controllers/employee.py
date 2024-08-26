@@ -9,7 +9,7 @@ class GetEmployee(AdminAPI, MongoDB):
     def __init__(self):
         MongoDB.__init__(self)
 
-    def get(self):
+    def post(self):
         data = request.get_json()
         employee_email = data.get("employee_email")
         company_id = data.get("company_id")
@@ -42,9 +42,10 @@ class GetEmployeeStats(AdminAPI, MongoDB):
     def __init__(self):
         MongoDB.__init__(self)
 
-    def get(self):
-        admin_details = self.get_admin()
-        company_id = admin_details['company_id']
+    def post(self):
+        data = request.get_json()
+        employee_email = data.get("employee_email")
+        company_id = data.get("company_id")
         start_date_str = request.args.get('start_date')
         end_date_str = request.args.get('end_date')
 
@@ -82,10 +83,11 @@ class GetEmployeeByEmail(EmployeeAPI, MongoDB):
     def __init__(self):
         MongoDB.__init__(self)
 
-    def get(self):
-        employee_details = self.get_employee()
-        employee_email = employee_details["employee_email"]
-        company_id = employee_details["company_id"]
+    def post(self):
+        data = request.get_json()
+        employee_email = data.get("employee_email")
+        company_id = data.get("company_id")
+
 
         emp = self.db.employees.find_one({"employee_email": employee_email, "company_id": company_id})
         if not emp:
