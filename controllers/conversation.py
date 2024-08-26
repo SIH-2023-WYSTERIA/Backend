@@ -123,14 +123,12 @@ class GetAllConversations(AdminAPI, MongoDB):
         if not company_id:
             return jsonify({"message": "Company ID is required"}), 400
 
-        employee_email = request.args.get("employee_email")
-        sentiment = request.args.get("sentiment")
+        employee_email = data.get("employee_email")
 
         filter_dict = {"company_id": company_id}
         if employee_email:
             filter_dict["employee_email"] = employee_email
-        if sentiment:
-            filter_dict["inference.sentiment"] = sentiment
+
 
         conversations = list(self.db.conversations.find(filter_dict).sort([("_id", -1)]))
         conversations_json = [
