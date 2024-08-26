@@ -12,10 +12,9 @@ from services import Finetune
 
 load_dotenv()
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
+CORS(app, resources={r"/*": {"origins": "*"}})
 subprocess.run(["huggingface-cli", "login", "--token", os.getenv('HUGGINGFACE_TOKEN')])
-app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY')  # Replace with your secret key
-app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(days=365) 
+
 jwt = JWTManager(app)
 
 # Register the public and private blueprints
@@ -24,8 +23,6 @@ app.register_blueprint(private_bp)
 
 
 if __name__ == '__main__':
-    certfile = './ssl_keys/cert.pem'
-    keyfile = './ssl_keys/key.pem'
 
     # For https
     # Passphrase is "sih2023"
