@@ -12,7 +12,7 @@ from services import Finetune
 
 load_dotenv()
 app = Flask(__name__)
-CORS(app,origins='*')
+CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
 subprocess.run(["huggingface-cli", "login", "--token", os.getenv('HUGGINGFACE_TOKEN')])
 app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY')  # Replace with your secret key
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(days=365) 
