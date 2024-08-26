@@ -9,7 +9,7 @@ class GetStats(AdminAPI, MongoDB):
     def __init__(self):
         MongoDB.__init__(self)
 
-    def get(self):
+    def post(self):
         data = request.get_json()
         company_id = data.get("company_id")
 
