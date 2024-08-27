@@ -98,10 +98,9 @@ class SendConversation(EmployeeAPI, S3, MongoDB):
 
             # Generate the S3 URL for the uploaded file
             s3_url = self.get_s3_url(filename)
+            employee_email = request.form.get("employee_email")
+            company_id = request.form.get("company_id")
 
-            employee = self.get_employee()
-            employee_email = employee["employee_email"]
-            company_id = employee["company_id"]
             index = self.get_next_index()
             inference,customer_plot,helpdesk_plot = Model_Inference(file_path)
 
@@ -150,21 +149,21 @@ class GetAllConversations(AdminAPI, MongoDB):
     def __init__(self):
         MongoDB.__init__(self)
 
-    def get(self):
-        company_id = self.get_admin()["company_id"]
-        employee_email = request.args.get("employee_email")
-        sentiment = request.args.get("sentiment")
+    def post(self):
+        data = request.get_json()
+        company_id = data.get("company_id")
 
-        # Create a filter dictionary based on the provided parameters
-        filter_dict = {}
-        filter_dict["company_id"] = company_id
+        if not company_id:
+            return jsonify({"message": "Company ID is required"}), 400
 
+        employee_email = data.get("employee_email")
+
+        filter_dict = {"company_id": company_id}
         if employee_email:
             filter_dict["employee_email"] = employee_email
-        if sentiment:
-            filter_dict[
-                "inference.sentiment"
-            ] = sentiment  # Adjust the field name as per your MongoDB schema
+
+
+
 
         # Query the database to retrieve all conversations
         conversations = list(
@@ -192,19 +191,18 @@ class GetConversationsByEmail(EmployeeAPI, MongoDB):
     def __init__(self):
         MongoDB.__init__(self)
 
-    def get(self):
-        employee_email = self.get_employee()["employee_email"]
-        print(employee_email)
-        sentiment = request.args.get("sentiment")
+    def post(self):
+        data = request.get_json()
+        employee_email = data.get("employee_email")
+
+        if not employee_email:
+            return jsonify({"message": "Employee email is required"}), 400
 
         # Create a filter dictionary based on the provided parameters
         filter_dict = {}
         if employee_email:
             filter_dict["employee_email"] = employee_email
-        if sentiment:
-            filter_dict[
-                "inference.sentiment"
-            ] = sentiment  # Adjust the field name as per your MongoDB schema
+
 
         # Query the database to retrieve all conversations
         conversations = list(
