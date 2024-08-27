@@ -1,7 +1,6 @@
 import uuid
 from flask import jsonify, request
 from flask.views import MethodView
-from flask_jwt_extended import create_access_token
 from werkzeug.security import generate_password_hash, check_password_hash
 from dependencies.db import MongoDB
 import re
@@ -53,7 +52,7 @@ class RegisterEmployee(AdminAPI,MongoDB):
     def post(self):
         data = request.get_json()
         employee_email = data.get('employee_email')
-        company_id = self.get_admin()['company_id']
+        company_id = data.get('company_id')
         password = data.get('password')
         role = 'employee'
 
@@ -102,10 +101,9 @@ class CompanyLogin(BaseAuthAPI):
 
         if check_password_hash(company["password"],password):
             # Generate a JWT token with user identity and role
-            access_token = create_access_token(
-                identity={"company_id": company["company_id"], "role": company["role"]}
-            )
-            return jsonify({"access_token": access_token}), 200
+
+            identity={"company_id": company["company_id"], "role": company["role"]}
+            return jsonify({" identity":  identity}), 200
         else:
             return jsonify({"message": "Invalid credentials"}), 401
 
@@ -124,11 +122,11 @@ class EmployeeLogin(BaseAuthAPI):
 
         if check_password_hash(employee["password"],password):
             # Generate a JWT token with user identity and role
-            access_token = create_access_token(
-                identity={"employee_email": employee["employee_email"],
+    
+            identity={"employee_email": employee["employee_email"],
                           'company_id': employee["company_id"],
                           "role": employee["role"]}
-            )
-            return jsonify({"access_token": access_token}), 200
+
+            return jsonify({"identity": identity}), 200
         else:
             return jsonify({"message": "Invalid credentials"}), 401
